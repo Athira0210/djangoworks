@@ -2,11 +2,13 @@ from django.shortcuts import render
 
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from productapi.models import Products
+from productapi.models import Products,Reviews
 from productapi.serializers import Productserializer
 from rest_framework import status
-from productapi.serializers import ProductModelSerializer
-from rest_framework.viewsets import ViewSet
+from productapi.serializers import ProductModelSerializer,UserSerializer,ReviewSerializer
+from rest_framework.viewsets import ViewSet,ModelViewSet
+from rest_framework import authentication,permissions
+from rest_framework.decorators import action
 
 
 
@@ -131,4 +133,51 @@ class ProductViewsetview(ViewSet):
         return Response({"msg": "deleted"}, status=status.HTTP_400_BAD_REQUEST)
 
 
+class ProductModelViewsetView(ModelViewSet):
+    serializer_class = ProductModelSerializer
+    queryset = Products.objects.all()
+    authentication_classes = [authentication.TokenAuthentication]
+    permissions=[permissions.IsAuthenticated]
 
+    @action(methods=['get'],detail=True)
+    def get_reviews(self,request,*args,**kwargs):
+        id=kwargs.get("pk")
+        product=Products.objects.get(id=id)
+        review=product.reviews_set.all()
+        serializer=ReviewSerializer(review,many=True)
+        return Response(data=serializer.data)
+
+    @action(methods=["post"],detail=True)
+    def post_review(self,request,*args,**kwargs):
+        author=request.user
+        id = kwargs.get("pk")
+        product = Products.objects.get(id=id)
+        serializer=ReviewSerializer(data=request.data,context={"author":author,"product":product})
+        if serializer.is_valid():
+            serializer.save()
+            return Response(data=serializer.data)
+        else:
+            return Response(data=serializer.errors)
+
+        # @action(methods=["post"], detail=True)
+        # def post_review(self, request, *args, **kwargs):
+        #     author = request.user
+        #     id = kwargs.get("pk")
+        #     product = Products.objects.get(id=id)
+        # review=request.data.get("review")
+        # rating=request.data.get("rating")
+        # qs=Reviews.objects.create(
+        #     author=author,
+        #     product=product,
+        #     rating=rating,
+        #     review=review
+        # )
+        # serializer=ReviewSerializer(qs)
+        # return Response(data=serializer.data)
+
+
+from django.contrib.auth.models import User
+
+class UserModelViewsetView(ModelViewSet):
+    serializer_class = UserSerializer
+    queryset = User.objects.all()
